@@ -126,3 +126,15 @@ contract RPS {
         }
     }
 }
+
+contract Factory {
+    address public rps;
+
+    // Returns the address of the newly deployed contract
+    function deploy(bytes32 _salt) public payable returns (address) {
+        // This syntax is a newer way to invoke create2 without assembly, you just need to pass salt
+        // https://docs.soliditylang.org/en/latest/control-structures.html#salted-contract-creations-create2
+        rps = address(new RPS{salt: _salt}());
+        return rps;
+    }
+}
