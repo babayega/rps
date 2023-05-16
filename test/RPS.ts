@@ -30,10 +30,7 @@ describe("RPS", function () {
     beforeEach(async function () {
       await deployRPS();
     })
-    it("Should deploy the contract and register both players", async function () {
-      // console.log(rps.connect(fp).revealChoice())
-      // ethers.utils.solidityPack(["int16", "uint48"], [-1, 12])
-      // ethers.utils.
+    it("Second player should win", async function () {
       const fpMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Rock, "123"])
       const spMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Paper, "12"])
       await rps.connect(fp).commitChoice(fpMove);
@@ -41,12 +38,42 @@ describe("RPS", function () {
 
 
       await rps.connect(fp).revealChoice(Move.Rock, 123);
-      console.log(await rps.firstPlayerChoice());
+      expect(await rps.firstPlayerChoice()).to.be.eq(1);
 
       await rps.connect(sp).revealChoice(Move.Paper, 12);
-      console.log(await rps.secondPlayerChoice());
+      expect(await rps.secondPlayerChoice()).to.be.eq(2);
 
-      console.log(await rps.getResult());
+      expect(await rps.getResult()).to.be.eq(2);;
+    });
+    it("First player should win", async function () {
+      const fpMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Scissor, "123"])
+      const spMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Paper, "12"])
+      await rps.connect(fp).commitChoice(fpMove);
+      await rps.connect(sp).commitChoice(spMove);
+
+
+      await rps.connect(fp).revealChoice(Move.Scissor, 123);
+      expect(await rps.firstPlayerChoice()).to.be.eq(3);
+
+      await rps.connect(sp).revealChoice(Move.Paper, 12);
+      expect(await rps.secondPlayerChoice()).to.be.eq(2);
+
+      expect(await rps.getResult()).to.be.eq(1);
+    });
+    it("Draw", async function () {
+      const fpMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Paper, "123"])
+      const spMove = ethers.utils.soliditySha256(["uint8", "uint"], [Move.Paper, "12"])
+      await rps.connect(fp).commitChoice(fpMove);
+      await rps.connect(sp).commitChoice(spMove);
+
+
+      await rps.connect(fp).revealChoice(Move.Paper, 123);
+      expect(await rps.firstPlayerChoice()).to.be.eq(2);
+
+      await rps.connect(sp).revealChoice(Move.Paper, 12);
+      expect(await rps.secondPlayerChoice()).to.be.eq(2);
+
+      expect(await rps.getResult()).to.be.eq(3);
     });
   });
 });
