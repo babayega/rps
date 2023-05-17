@@ -2,8 +2,8 @@
 pragma solidity ^0.8.9;
 
 contract RPS {
-    address firstPlayer;
-    address secondPlayer;
+    address payable firstPlayer;
+    address payable secondPlayer;
 
     bytes32 private firstPlayerHash;
     bytes32 private secondPlayerHash;
@@ -26,8 +26,10 @@ contract RPS {
     Move public secondPlayerChoice = Move.Empty;
 
     bool gameEnded = false;
+    bool resultDeclared = false;
 
-    mapping(address => uint) public balances;
+    uint256 public constant BETTING_AMOUNT = 1e15;
+    uint256 public constant COMMISION = 50;
 
     modifier notAlreadyRegistered() {
         require(
@@ -38,7 +40,7 @@ contract RPS {
     }
 
     function resetAll() public {
-        require(gameEnded);
+        require(gameEnded && resultDeclared);
 
         firstPlayerHash = 0x0;
         secondPlayerHash = 0x0;
@@ -47,11 +49,12 @@ contract RPS {
         gameEnded = false;
     }
 
-    function register() public notAlreadyRegistered {
+    function register() public payable notAlreadyRegistered {
+        require(msg.value == 1e15, "please pay the betting amount");
         if (firstPlayer == address(0x0)) {
-            firstPlayer = msg.sender;
+            firstPlayer = payable(msg.sender);
         } else if (secondPlayer == address(0x0)) {
-            secondPlayer = msg.sender;
+            secondPlayer = payable(msg.sender);
         } else {
             revert("both players registered");
         }
@@ -99,8 +102,9 @@ contract RPS {
     }
 
     // check the result
-    function getResult() public view returns (Result res) {
+    function getResult() public returns (Result res) {
         require(gameEnded == true, "someone did not reveal their choice");
+        require(resultDeclared == false, "result already declared");
 
         // draw
         if (firstPlayerChoice == secondPlayerChoice) {
@@ -124,6 +128,24 @@ contract RPS {
                 res = Result.FirstPlayer;
             }
         }
+
+        if (res == Result.FirstPlayer) {
+            // Transfer money to the first player
+            firstPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
+        } else if (res == Result.SecondPlayer) {
+            // Transfer money to the second player
+            secondPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
+        } else if (res == Result.Draw) {
+            // transfer equal
+            firstPlayer.transfer(BETTING_AMOUNT);
+            secondPlayer.transfer(BETTING_AMOUNT);
+        }
+
+        resultDeclared = true;
+    }
+
+    function getContractBalance() public view returns (uint) {
+        return address(this).balance;
     }
 }
 
