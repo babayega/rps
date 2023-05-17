@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-contract RPS {
+import "hardhat/console.sol";
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract RPS is ReentrancyGuard {
     address payable firstPlayer;
     address payable secondPlayer;
 
     bytes32 private firstPlayerHash;
     bytes32 private secondPlayerHash;
+
+    uint256 public constant BLOCK_LIMIT = 200;
+    uint256 private firstRegisterBlock;
 
     enum Move {
         Empty,
@@ -47,12 +54,14 @@ contract RPS {
         firstPlayerChoice = Move.Empty;
         secondPlayerChoice = Move.Empty;
         gameEnded = false;
+        resultDeclared = false;
     }
 
     function register() public payable notAlreadyRegistered {
         require(msg.value == 1e15, "please pay the betting amount");
         if (firstPlayer == address(0x0)) {
             firstPlayer = payable(msg.sender);
+            firstRegisterBlock = block.number;
         } else if (secondPlayer == address(0x0)) {
             secondPlayer = payable(msg.sender);
         } else {
@@ -102,10 +111,12 @@ contract RPS {
     }
 
     // check the result
-    function getResult() public returns (Result res) {
+    function getResult() public nonReentrant returns (Result res) {
         require(gameEnded == true, "someone did not reveal their choice");
         require(resultDeclared == false, "result already declared");
 
+        resultDeclared = true;
+        firstRegisterBlock = 0;
         // draw
         if (firstPlayerChoice == secondPlayerChoice) {
             res = Result.Draw;
@@ -140,8 +151,15 @@ contract RPS {
             firstPlayer.transfer(BETTING_AMOUNT);
             secondPlayer.transfer(BETTING_AMOUNT);
         }
+    }
 
-        resultDeclared = true;
+    function expireGame() public nonReentrant {
+        if ((firstRegisterBlock + BLOCK_LIMIT) < block.number) {
+            resultDeclared = true;
+            firstRegisterBlock = 0;
+            firstPlayer.transfer(BETTING_AMOUNT);
+            secondPlayer.transfer(BETTING_AMOUNT);
+        }
     }
 
     function getContractBalance() public view returns (uint) {

@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { RPS } from "../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { mine } from "@nomicfoundation/hardhat-network-helpers";
 
 enum Move {
   Empty = 0,
@@ -90,6 +91,20 @@ describe("RPS", function () {
       const before = await provider.getBalance(fp.address);
       const befores = await provider.getBalance(sp.address);
       await rps.connect(tt).getResult();
+      const after = await provider.getBalance(fp.address);
+      const afters = await provider.getBalance(sp.address);
+
+      expect(after.sub(before)).to.be.eq(1e15);
+      expect(afters.sub(befores)).to.be.eq(1e15);
+    });
+
+    it("Should be able to expire after 300 blocks", async function () {
+      await mine(300);
+
+      const provider = ethers.provider;
+      const before = await provider.getBalance(fp.address);
+      const befores = await provider.getBalance(sp.address);
+      await rps.connect(tt).expireGame()
       const after = await provider.getBalance(fp.address);
       const afters = await provider.getBalance(sp.address);
 
