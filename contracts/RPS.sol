@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract RPS is ReentrancyGuard {
-    address payable firstPlayer;
-    address payable secondPlayer;
+    //
+    // MODIFIERS
+    //
+    modifier notAlreadyRegistered() {
+        require(
+            msg.sender != firstPlayer && msg.sender != secondPlayer,
+            "already registered"
+        );
+        _;
+    }
 
-    bytes32 private firstPlayerHash;
-    bytes32 private secondPlayerHash;
-
-    uint256 public constant BLOCK_LIMIT = 200;
-    uint256 private firstRegisterBlock;
-
+    //
+    // Enums
+    //
     enum Move {
         Empty,
         Rock,
@@ -29,23 +32,41 @@ contract RPS is ReentrancyGuard {
         Draw
     }
 
+    //
+    // Constants
+    //
+    uint256 public constant BETTING_AMOUNT = 1e15; // 0.001
+    uint256 public constant COMMISION = 50; // 50%
+    uint256 public constant BLOCK_LIMIT = 200;
+
+    /// @notice Address of the first registered player
+    address payable firstPlayer;
+
+    /// @notice Address of the first registered player
+    address payable secondPlayer;
+
+    /// @notice Choice of the first player hashed with sha256
+    bytes32 private firstPlayerHash;
+
+    /// @notice Choice of the second player hashed with sha256
+    bytes32 private secondPlayerHash;
+
+    /// @notice Block number at which current round started
+    uint256 private firstRegisterBlock;
+
+    /// @notice Move of the first player after revealing
     Move public firstPlayerChoice = Move.Empty;
+
+    /// @notice Move of the first player after revealing
     Move public secondPlayerChoice = Move.Empty;
 
+    /// @notice Bool to identify whether the game has ended
     bool gameEnded = false;
+
+    /// @notice Bool to identify whether the result has been declared
     bool resultDeclared = false;
 
-    uint256 public constant BETTING_AMOUNT = 1e15;
-    uint256 public constant COMMISION = 50;
-
-    modifier notAlreadyRegistered() {
-        require(
-            msg.sender != firstPlayer && msg.sender != secondPlayer,
-            "already registered"
-        );
-        _;
-    }
-
+    /// @notice Resets the values of the round after result declaration
     function resetAll() public {
         require(gameEnded && resultDeclared);
 
@@ -57,6 +78,7 @@ contract RPS is ReentrancyGuard {
         resultDeclared = false;
     }
 
+    /// @notice Register as a player for the new round, a betting amount is necessary
     function register() public payable notAlreadyRegistered {
         require(msg.value == 1e15, "please pay the betting amount");
         if (firstPlayer == address(0x0)) {
@@ -69,7 +91,10 @@ contract RPS is ReentrancyGuard {
         }
     }
 
-    // commit the choice (Rock / Paper / Scissor)
+    /**
+     * @notice Commit the choice (Rock / Paper / Scissor) by the player
+     * @param hash is the hash of the choice made by the player
+     */
     function commitChoice(bytes32 hash) public payable {
         if (msg.sender == firstPlayer && firstPlayerHash == 0x0) {
             firstPlayerHash = hash;
@@ -80,7 +105,11 @@ contract RPS is ReentrancyGuard {
         }
     }
 
-    // reveal the choice (Rock / Paper / Scissor)
+    /**
+     * @notice Reveal the choice (Rock / Paper / Scissor) by the player
+     * @param move is the move made by the player
+     * @param salt is the random string to generate unique hash
+     */
     function revealChoice(Move move, uint salt) public {
         require(
             msg.sender == firstPlayer || msg.sender == secondPlayer,
@@ -110,7 +139,8 @@ contract RPS is ReentrancyGuard {
         }
     }
 
-    // check the result
+    /// @notice Declares the result and transfers winning amount
+    /// after both the players have revealed their choices
     function getResult() public nonReentrant returns (Result res) {
         require(gameEnded == true, "someone did not reveal their choice");
         require(resultDeclared == false, "result already declared");
@@ -153,6 +183,8 @@ contract RPS is ReentrancyGuard {
         }
     }
 
+    /// @notice Expire the game and return the money if no activity
+    /// after a certain block height
     function expireGame() public nonReentrant {
         if ((firstRegisterBlock + BLOCK_LIMIT) < block.number) {
             resultDeclared = true;

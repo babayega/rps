@@ -18,7 +18,7 @@ const main = async ({
 
     console.log(`Factory @ ${rps.address}`);
 
-    await execute('Factory', { from: deployer }, 'deploy', ...[ethers.utils.formatBytes32String("1234")]);
+    await execute('Factory', { from: deployer }, 'deploy', ...[ethers.utils.formatBytes32String("concave")]);
     // console.log(rec);
 };
 main.tags = ["RPS_Factory"];
