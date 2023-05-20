@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-
-contract RPS is ReentrancyGuard {
+contract RPS {
     //
     // MODIFIERS
     //
@@ -13,6 +11,13 @@ contract RPS is ReentrancyGuard {
             "already registered"
         );
         _;
+    }
+
+    modifier nonReentrant() {
+        require(entered == false, "RPS: reentrant call");
+        entered = true;
+        _;
+        entered = false;
     }
 
     //
@@ -66,6 +71,9 @@ contract RPS is ReentrancyGuard {
     /// @notice Bool to identify whether the result has been declared
     bool resultDeclared = false;
 
+    /// @notice Bool to identify whether the function is already entered
+    bool private entered = false;
+
     /// @notice Resets the values of the round after result declaration
     function resetAll() public {
         require(gameEnded && resultDeclared);
@@ -81,13 +89,13 @@ contract RPS is ReentrancyGuard {
     /// @notice Register as a player for the new round, a betting amount is necessary
     function register() public payable notAlreadyRegistered {
         require(msg.value == 1e15, "please pay the betting amount");
+
         if (firstPlayer == address(0x0)) {
             firstPlayer = payable(msg.sender);
             firstRegisterBlock = block.number;
-        } else if (secondPlayer == address(0x0)) {
-            secondPlayer = payable(msg.sender);
         } else {
-            revert("both players registered");
+            require(secondPlayer == address(0x0), "both players registered");
+            secondPlayer = payable(msg.sender);
         }
     }
 
@@ -121,19 +129,20 @@ contract RPS is ReentrancyGuard {
         );
         require(move != Move.Empty, "have to choose Rock/Paper/Scissor");
 
-        if (msg.sender == firstPlayer) {
-            if (firstPlayerHash == sha256(abi.encodePacked(move, salt))) {
-                firstPlayerChoice = move;
-            }
-        } else {
-            if (secondPlayerHash == sha256(abi.encodePacked(move, salt))) {
-                secondPlayerChoice = move;
-            }
+        if (
+            msg.sender == firstPlayer &&
+            firstPlayerHash == sha256(abi.encodePacked(move, salt))
+        ) {
+            firstPlayerChoice = move;
+        } else if (
+            msg.sender == secondPlayer &&
+            secondPlayerHash == sha256(abi.encodePacked(move, salt))
+        ) {
+            secondPlayerChoice = move;
         }
 
         if (
-            !(firstPlayerChoice == Move.Empty &&
-                secondPlayerChoice == Move.Empty)
+            firstPlayerChoice != Move.Empty && secondPlayerChoice != Move.Empty
         ) {
             gameEnded = true;
         }
@@ -147,39 +156,24 @@ contract RPS is ReentrancyGuard {
 
         resultDeclared = true;
         firstRegisterBlock = 0;
-        // draw
+
         if (firstPlayerChoice == secondPlayerChoice) {
             res = Result.Draw;
-        } else if (firstPlayerChoice == Move.Rock) {
-            if (secondPlayerChoice == Move.Paper) {
-                res = Result.SecondPlayer;
-            } else {
-                res = Result.FirstPlayer;
-            }
-        } else if (firstPlayerChoice == Move.Paper) {
-            if (secondPlayerChoice == Move.Scissor) {
-                res = Result.SecondPlayer;
-            } else {
-                res = Result.FirstPlayer;
-            }
-        } else if (firstPlayerChoice == Move.Scissor) {
-            if (secondPlayerChoice == Move.Rock) {
-                res = Result.SecondPlayer;
-            } else {
-                res = Result.FirstPlayer;
-            }
-        }
-
-        if (res == Result.FirstPlayer) {
-            // Transfer money to the first player
-            firstPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
-        } else if (res == Result.SecondPlayer) {
-            // Transfer money to the second player
-            secondPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
-        } else if (res == Result.Draw) {
-            // transfer equal
             firstPlayer.transfer(BETTING_AMOUNT);
             secondPlayer.transfer(BETTING_AMOUNT);
+        } else if (
+            (firstPlayerChoice == Move.Rock &&
+                secondPlayerChoice == Move.Scissor) ||
+            (firstPlayerChoice == Move.Paper &&
+                secondPlayerChoice == Move.Rock) ||
+            (firstPlayerChoice == Move.Scissor &&
+                secondPlayerChoice == Move.Paper)
+        ) {
+            res = Result.FirstPlayer;
+            firstPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
+        } else {
+            res = Result.SecondPlayer;
+            secondPlayer.transfer((BETTING_AMOUNT * 2 * COMMISION) / 100);
         }
     }
 
