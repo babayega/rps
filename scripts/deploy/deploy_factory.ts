@@ -18,6 +18,8 @@ const main = async ({
 
     console.log(`Factory @ ${rps.address}`);
 
+    console.log('test')
+
     await execute('Factory', { from: deployer }, 'deploy', ...[ethers.utils.formatBytes32String("concave")]);
     // console.log(rec);
 };
